@@ -204,7 +204,7 @@ attempt to send data on a closed socket:
 --- timeout: 10
 --- config
     server_tokens off;
-    resolver $TEST_NGINX_RESOLVER;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     resolver_timeout 3s;
     location /t {
         rewrite_by_lua '
@@ -250,11 +250,11 @@ attempt to send data on a closed socket:
     }
 --- request
 GET /t
---- response_body
+--- response_body_like
 connected: 1
 request sent: 56
-first line received: HTTP/1.1 200 OK
-second line received: Server: openresty
+first line received: HTTP\/1\.1 200 OK
+second line received: (?:Date|Server): .*?
 --- no_error_log
 [error]
 
@@ -296,7 +296,7 @@ qr/connect\(\) failed \(\d+: Connection refused\)/
 
 === TEST 6: connection timeout (tcp)
 --- config
-    resolver $TEST_NGINX_RESOLVER;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     lua_socket_connect_timeout 100ms;
     lua_socket_send_timeout 100ms;
     lua_socket_read_timeout 100ms;
@@ -304,7 +304,7 @@ qr/connect\(\) failed \(\d+: Connection refused\)/
     location /test {
         rewrite_by_lua '
             local sock = ngx.socket.tcp()
-            local ok, err = sock:connect("agentzh.org", 12345)
+            local ok, err = sock:connect("127.0.0.2", 12345)
             ngx.say("connect: ", ok, " ", err)
 
             local bytes
@@ -329,7 +329,7 @@ send: nil closed
 receive: nil closed
 close: nil closed
 --- error_log
-lua tcp socket connect timed out
+lua tcp socket connect timed out, when connecting to 127.0.0.2:12345
 --- timeout: 10
 
 
@@ -372,7 +372,7 @@ connected: 1
 === TEST 8: resolver error (host not found)
 --- config
     server_tokens off;
-    resolver $TEST_NGINX_RESOLVER;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     resolver_timeout 3s;
     location /t {
         rewrite_by_lua '
@@ -415,7 +415,7 @@ attempt to send data on a closed socket
 === TEST 9: resolver error (timeout)
 --- config
     server_tokens off;
-    resolver 8.8.8.8;
+    resolver $TEST_NGINX_RESOLVER ipv6=off;
     resolver_timeout 1ms;
     location /t {
         rewrite_by_lua '
@@ -446,7 +446,7 @@ attempt to send data on a closed socket
 --- request
 GET /t
 --- response_body_like
-^failed to connect: blah-blah-not-found\.agentzh\.org could not be resolved(?: \(\d+: Operation timed out\))?
+^failed to connect: blah-blah-not-found\.agentzh\.org could not be resolved(?: \(\d+: (?:Operation timed out|Host not found)\))?
 connected: nil
 failed to send request: closed$
 --- error_log
@@ -940,7 +940,7 @@ close: 1 nil
                 end
             end
 
-            ok, err = sock:close()
+            local ok, err = sock:close()
             ngx.say("close: ", ok, " ", err)
         ';
 
@@ -1082,7 +1082,7 @@ close: 1 nil
 
 === TEST 19: cannot survive across request boundary (send)
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location /t {
@@ -1143,7 +1143,7 @@ received: OK|failed to send request: closed)\$"
 
 === TEST 20: cannot survive across request boundary (receive)
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location /t {
@@ -1214,7 +1214,7 @@ received: OK|failed to receive a line: closed \[nil\])$/
 
 === TEST 21: cannot survive across request boundary (close)
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location /t {
@@ -1285,7 +1285,7 @@ received: OK|failed to close: closed)$/
 
 === TEST 22: cannot survive across request boundary (connect)
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location /t {
@@ -2041,7 +2041,7 @@ close: 1 nil
 
 === TEST 33: bad request tries to connect
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location = /main {
@@ -2097,7 +2097,7 @@ qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):7: bad request/
 
 === TEST 34: bad request tries to receive
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location = /main {
@@ -2156,7 +2156,7 @@ qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 === TEST 35: bad request tries to send
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location = /main {
@@ -2215,7 +2215,7 @@ qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 === TEST 36: bad request tries to close
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location = /main {
@@ -2274,7 +2274,7 @@ qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 === TEST 37: bad request tries to set keepalive
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location = /main {
@@ -2333,7 +2333,7 @@ qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):14: bad request/
 
 === TEST 38: bad request tries to receiveuntil
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 --- config
     server_tokens off;
     location = /main {
@@ -2390,4 +2390,3 @@ qr/runtime error: rewrite_by_lua\(nginx\.conf:\d+\):16: bad request/
 
 --- no_error_log
 [alert]
-

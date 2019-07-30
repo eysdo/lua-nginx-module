@@ -127,7 +127,7 @@ del timer 1234
     send_timeout 200ms;
     location /lua {
         content_by_lua '
-            function f()
+            local function f()
                 ngx.say("hello in thread")
                 ngx.sleep(0.1)
                 ngx.exit(0)
@@ -318,4 +318,3 @@ qr/failed to flush: client aborted/,
 --- timeout: 0.2
 --- abort
 --- wait: 1
-

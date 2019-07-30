@@ -580,7 +580,7 @@ s: a好
 
 === TEST 28: just hit match limit
 --- http_config
-    lua_regex_match_limit 5600;
+    lua_regex_match_limit 5000;
 --- config
     location /re {
         content_by_lua_file html/a.lua;
@@ -590,7 +590,7 @@ s: a好
 >>> a.lua
 local re = [==[(?i:([\s'\"`´’‘\(\)]*)?([\d\w]+)([\s'\"`´’‘\(\)]*)?(?:=|<=>|r?like|sounds\s+like|regexp)([\s'\"`´’‘\(\)]*)?\2|([\s'\"`´’‘\(\)]*)?([\d\w]+)([\s'\"`´’‘\(\)]*)?(?:!=|<=|>=|<>|<|>|\^|is\s+not|not\s+like|not\s+regexp)([\s'\"`´’‘\(\)]*)?(?!\6)([\d\w]+))]==]
 
-s = string.rep([[ABCDEFG]], 10)
+local s = string.rep([[ABCDEFG]], 10)
 
 local start = ngx.now()
 
@@ -617,7 +617,7 @@ error: pcre_exec() failed: -8
 
 === TEST 29: just not hit match limit
 --- http_config
-    lua_regex_match_limit 5700;
+    lua_regex_match_limit 5100;
 --- config
     location /re {
         content_by_lua_file html/a.lua;
@@ -693,7 +693,7 @@ ab.cd
 
 location = /t {
     content_by_lua '
-        function test()
+        local function test()
             local data = [[
                 OUTER {FIRST}
 ]]

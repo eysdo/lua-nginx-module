@@ -154,7 +154,7 @@ res2.body = b
 
     location /main {
         rewrite_by_lua '
-            res = ngx.location.capture("/foo?n=1")
+            local res = ngx.location.capture("/foo?n=1")
             ngx.say("top res.status = " .. res.status)
             ngx.say("top res.body = [" .. res.body .. "]")
         ';
@@ -392,4 +392,3 @@ res4.status = 201
 res4.body = STORED\r
 
 "
-

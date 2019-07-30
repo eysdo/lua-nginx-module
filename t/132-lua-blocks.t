@@ -12,6 +12,8 @@ repeat_each(2);
 
 plan tests => repeat_each() * (blocks() * 3 + 3);
 
+$ENV{TEST_NGINX_HTML_DIR} ||= html_dir();
+
 #no_diff();
 no_long_string();
 run_tests();

@@ -357,6 +357,12 @@ HTTP_LUA_SRCS=" \
             $ngx_addon_dir/src/ngx_http_lua_ssl_ocsp.c \
             $ngx_addon_dir/src/ngx_http_lua_lex.c \
             $ngx_addon_dir/src/ngx_http_lua_balancer.c \
+            $ngx_addon_dir/src/ngx_http_lua_ssl_session_storeby.c \
+            $ngx_addon_dir/src/ngx_http_lua_ssl_session_fetchby.c \
+            $ngx_addon_dir/src/ngx_http_lua_ssl.c \
+            $ngx_addon_dir/src/ngx_http_lua_log_ringbuf.c \
+            $ngx_addon_dir/src/ngx_http_lua_input_filters.c \
+            $ngx_addon_dir/src/ngx_http_lua_pipe.c \
             "
 
 HTTP_LUA_DEPS=" \
@@ -414,6 +420,12 @@ HTTP_LUA_DEPS=" \
             $ngx_addon_dir/src/ngx_http_lua_ssl_certby.h \
             $ngx_addon_dir/src/ngx_http_lua_lex.h \
             $ngx_addon_dir/src/ngx_http_lua_balancer.h \
+            $ngx_addon_dir/src/ngx_http_lua_ssl_session_storeby.h \
+            $ngx_addon_dir/src/ngx_http_lua_ssl_session_fetchby.h \
+            $ngx_addon_dir/src/ngx_http_lua_ssl.h \
+            $ngx_addon_dir/src/ngx_http_lua_log_ringbuf.h \
+            $ngx_addon_dir/src/ngx_http_lua_input_filters.h \
+            $ngx_addon_dir/src/ngx_http_lua_pipe.h \
             "
 
 CFLAGS="$CFLAGS -DNDK_SET_VAR"
@@ -466,32 +478,16 @@ ngx_feature_test='setsockopt(1, SOL_SOCKET, SO_PASSCRED, NULL, 0);'
 
 . auto/feature
 
-ngx_feature="mmap(sbrk(0))"
+ngx_feature="SA_RESTART"
 ngx_feature_libs=
-ngx_feature_name="NGX_HTTP_LUA_HAVE_MMAP_SBRK"
-ngx_feature_run=yes
-ngx_feature_incs="#include <unistd.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <sys/mman.h>
-#define align_ptr(p, a)                                                   \
-    (u_char *) (((uintptr_t) (p) + ((uintptr_t) a - 1)) & ~((uintptr_t) a - 1))
-"
-ngx_feature_test="
-#if defined(__x86_64__)
-exit(mmap(align_ptr(sbrk(0), getpagesize()), 1, PROT_READ,
-          MAP_FIXED|MAP_PRIVATE|MAP_ANON, -1, 0) < (void *) 0x40000000LL
-          ? 0 : 1);
-#else
-exit(1);
-#endif
-"
-SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
-CC_TEST_FLAGS="-Werror -Wall $CC_TEST_FLAGS"
+ngx_feature_name="NGX_HTTP_LUA_HAVE_SA_RESTART"
+ngx_feature_run=no
+ngx_feature_incs="#include <signal.h>"
+ngx_feature_path=
+ngx_feature_test='struct sigaction act;
+                  act.sa_flags |= SA_RESTART;'
 
 . auto/feature
-
-CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
 
 ngx_feature="__attribute__(constructor)"
 ngx_feature_libs=
@@ -513,6 +509,69 @@ CC_TEST_FLAGS="-Werror -Wall $CC_TEST_FLAGS"
 
 CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
 
+# ----------------------------------------
+
+ngx_feature="malloc_trim"
+ngx_feature_libs=
+ngx_feature_name="NGX_HTTP_LUA_HAVE_MALLOC_TRIM"
+ngx_feature_run=yes
+ngx_feature_incs="#include <malloc.h>
+#include <stdio.h>"
+ngx_feature_test="int rc = malloc_trim((size_t) 0); printf(\"%d\", rc);"
+SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
+CC_TEST_FLAGS="-Werror -Wall $CC_TEST_FLAGS"
+
+. auto/feature
+
+CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
+
+# ----------------------------------------
+
+ngx_feature="pipe2"
+ngx_feature_libs=
+ngx_feature_name="NGX_HTTP_LUA_HAVE_PIPE2"
+ngx_feature_run=no
+ngx_feature_incs="#include <fcntl.h>"
+ngx_feature_test="int fd[2]; pipe2(fd, O_CLOEXEC|O_NONBLOCK);"
+SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
+CC_TEST_FLAGS="-Werror -Wall $CC_TEST_FLAGS"
+
+. auto/feature
+
+CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
+
+# ----------------------------------------
+
+ngx_feature="signalfd"
+ngx_feature_libs=
+ngx_feature_name="NGX_HTTP_LUA_HAVE_SIGNALFD"
+ngx_feature_run=no
+ngx_feature_incs="#include <sys/signalfd.h>"
+ngx_feature_test="sigset_t set; signalfd(-1, &set, SFD_NONBLOCK|SFD_CLOEXEC);"
+SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
+CC_TEST_FLAGS="-Werror -Wall $CC_TEST_FLAGS"
+
+. auto/feature
+
+CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
+
+# ----------------------------------------
+
+ngx_feature="execvpe"
+ngx_feature_libs=
+ngx_feature_name="NGX_HTTP_LUA_HAVE_EXECVPE"
+ngx_feature_run=no
+ngx_feature_incs=
+ngx_feature_test='char* argv[] = {"/bin/sh"};execvpe("/bin/sh", argv, NULL);'
+SAVED_CC_TEST_FLAGS="$CC_TEST_FLAGS"
+CC_TEST_FLAGS="-Werror -Wall $CC_TEST_FLAGS"
+
+. auto/feature
+
+CC_TEST_FLAGS="$SAVED_CC_TEST_FLAGS"
+
+# ----------------------------------------
+
 if test -n "$ngx_module_link"; then
     ngx_module_type=HTTP_AUX_FILTER
     ngx_module_name=$ngx_addon_name
@@ -528,6 +587,42 @@ else
     CORE_INCS="$CORE_INCS $ngx_module_incs"
     CORE_LIBS="$CORE_LIBS $ngx_module_libs"
 fi
+
+# ----------------------------------------
+
+if [ $PCRE != NO -a $PCRE != YES ]; then
+    # force pcre_version symbol to be undefined when PCRE is statically linked
+    ngx_feature="force undefined symbols (--undefined)"
+    ngx_feature_libs="-Wl,--undefined=printf"
+    ngx_feature_name=
+    ngx_feature_run=no
+    ngx_feature_incs="#include <stdio.h>"
+    ngx_feature_path=
+    ngx_feature_test='printf("hello");'
+
+    . auto/feature
+
+    if [ $ngx_found = yes ]; then
+        CORE_LIBS="$CORE_LIBS -Wl,--undefined=pcre_version"
+    fi
+
+    # for LLVM ld (Darwin)
+    ngx_feature="force undefined symbols (-all_load -U)"
+    ngx_feature_libs="-all_load -U printf"
+    ngx_feature_name=
+    ngx_feature_run=no
+    ngx_feature_incs="#include <stdio.h>"
+    ngx_feature_path=
+    ngx_feature_test='printf("hello");'
+
+    . auto/feature
+
+    if [ $ngx_found = yes ]; then
+        CORE_LIBS="$CORE_LIBS -all_load -U pcre_version"
+    fi
+fi
+
+# ----------------------------------------
 
 #CFLAGS=$"$CFLAGS -DLUA_DEFAULT_PATH='\"/usr/local/openresty/lualib/?.lua\"'"
 #CFLAGS=$"$CFLAGS -DLUA_DEFAULT_CPATH='\"/usr/local/openresty/lualib/?.so\"'"

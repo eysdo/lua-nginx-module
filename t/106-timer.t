@@ -76,7 +76,7 @@ qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:4[4-9]|5[0-6])
 
 
 
-=== TEST 2: separated global env
+=== TEST 2: globals are shared
 --- config
     location /t {
         content_by_lua '
@@ -104,7 +104,7 @@ F(ngx_http_lua_timer_handler) {
 
 --- response_body
 registered timer
-foo = nil
+foo = 3
 
 --- wait: 0.1
 --- no_error_log
@@ -174,7 +174,7 @@ qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:4[4-9]|5[0-6])
             local begin = ngx.now()
             local function f()
                 print("my lua timer handler")
-                ngx.sleep(0.02)
+                ngx.sleep(0.2)
                 print("elapsed: ", ngx.now() - begin)
             end
             local ok, err = ngx.timer.at(0.05, f)
@@ -199,7 +199,7 @@ delete thread 2
 --- response_body
 registered timer
 
---- wait: 0.12
+--- wait: 0.3
 --- no_error_log
 [error]
 [alert]
@@ -208,7 +208,7 @@ registered timer
 --- error_log eval
 [
 qr/\[lua\] .*? my lua timer handler/,
-qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:6[4-9]|7[0-6])/,
+qr/\[lua\] content_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.(?:1[4-9]|2[0-6]?)/,
 "lua ngx.timer expired",
 "http lua close fake http connection"
 ]
@@ -320,7 +320,7 @@ qr/received: Server: \S+/,
 
 === TEST 6: tcp cosocket in timer handler (keep-alive connections)
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 
 --- config
     location = /t {
@@ -596,7 +596,7 @@ qr/\[lua\] log_by_lua\(nginx\.conf:\d+\):\d+: elapsed: 0\.0(?:6[4-9]|7[0-6])/,
 
 === TEST 10: tcp cosocket in timer handler (keep-alive connections) - log_by_lua
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 
 --- config
     location = /t {
@@ -693,7 +693,7 @@ qr/go\(\): connected: 1, reused: \d+/,
 
 === TEST 11: tcp cosocket in timer handler (keep-alive connections) - header_filter_by_lua
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 
 --- config
     location = /t {
@@ -799,7 +799,7 @@ qr/go\(\): connected: 1, reused: \d+/,
 
 === TEST 12: tcp cosocket in timer handler (keep-alive connections) - body_filter_by_lua
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 
 --- config
     location = /t {
@@ -912,7 +912,7 @@ qr/go\(\): connected: 1, reused: \d+/,
 
 === TEST 13: tcp cosocket in timer handler (keep-alive connections) - set_by_lua
 --- http_config eval
-    "lua_package_path '$::HtmlDir/?.lua;./?.lua';"
+    "lua_package_path '$::HtmlDir/?.lua;./?.lua;;';"
 
 --- config
     location = /t {
@@ -1023,7 +1023,7 @@ qr/go\(\): connected: 1, reused: \d+/,
         content_by_lua '
             local cc, cr, cy = coroutine.create, coroutine.resume, coroutine.yield
             local function f()
-                function f()
+                local function f()
                     local cnt = 0
                     for i = 1, 20 do
                         print("cnt = ", cnt)
@@ -1090,7 +1090,7 @@ registered timer
                 ngx.log(ngx.ERR, ...)
             end
             local function handle()
-                function f()
+                local function f()
                     print("hello in thread")
                     return "done"
                 end
@@ -2193,4 +2193,3 @@ ok
 --- error_log
 Bad bad bad
 --- skip_nginx: 4: < 1.7.1
-
